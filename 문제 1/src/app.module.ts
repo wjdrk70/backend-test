@@ -2,8 +2,6 @@ import {Module} from '@nestjs/common';
 import {UserModule} from "@src/user/user.module";
 import {DataSource} from "typeorm";
 import {TypeOrmModule} from "@nestjs/typeorm";
-import {ScryptModule} from "@coniface/nestjs-scrypt";
-import * as os from "node:os";
 import {User} from "@src/user/domain/user";
 
 @Module({
@@ -15,7 +13,7 @@ import {User} from "@src/user/domain/user";
         password: 'mypassword',
         database: 'example',
         entities: [
-        User
+            User
         ],
         synchronize: false,
 

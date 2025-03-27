@@ -4,16 +4,19 @@ import {CreateUserDto} from '@src/user/ui/dto/create.user.dto';
 import {User} from '@src/user/domain/user';
 import {HttpException} from '@nestjs/common';
 import {DataSource, Repository} from "typeorm";
-import {ScryptService} from "@coniface/nestjs-scrypt";
 import {getRepositoryToken} from "@nestjs/typeorm";
 import {IsolationLevel} from "typeorm/driver/types/IsolationLevel";
+jest.mock('argon2', () => ({
+    hash: jest.fn(),
+    verify: jest.fn(),
+}));
 
+const argon = require('argon2');
 
 describe('UserService Test', () => {
     let userService: UserService;
     let userRepository: jest.Mocked<Repository<User>>;
     let dataSource: jest.Mocked<DataSource>;
-    let scryptService: jest.Mocked<ScryptService>;
 
 
     beforeEach(async () => {
@@ -28,12 +31,12 @@ describe('UserService Test', () => {
             transaction: jest.fn(),
         };
 
-
-        const mockScryptService = {
-            kdf: jest.fn(),
+        jest.mock('argon2', () => ({
             hash: jest.fn(),
             verify: jest.fn(),
-        };
+        }));
+
+
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [UserService,
@@ -44,11 +47,9 @@ describe('UserService Test', () => {
                 {
                     provide: DataSource,
                     useValue: mockDataSource
-                },
-                {
-                    provide: ScryptService,
-                    useValue: mockScryptService
                 }
+
+
 
             ]
         }).compile();
@@ -56,14 +57,15 @@ describe('UserService Test', () => {
         userService = module.get<UserService>(UserService);
         userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
         dataSource = module.get<DataSource>(DataSource) as jest.Mocked<DataSource>;
-        scryptService = module.get<ScryptService>(ScryptService) as jest.Mocked<ScryptService>;
 
+        jest.clearAllMocks();
 
     });
 
 
     describe('회원가입', () => {
         it('유효한 사용자 정보를 받으면 사용자를 생성하고 ID가 포함된 사용자 정보를 반환해야 한다', async () => {
+
             // Given: 유효한 사용자 등록 정보
             const createUserDto: CreateUserDto = {
                 name: 'John Doe',
@@ -78,7 +80,10 @@ describe('UserService Test', () => {
                 email: 'john@example.com',
                 createdAt,
             };
+            const hashedPassword = '$argon2id$v=19$m=65536,t=3,p=4$hashedPasswordValue';
 
+            // argon.hash 모의 설정
+            argon.hash.mockResolvedValue(hashedPassword);
 
             const mockManager = {
                 findOneBy: jest.fn().mockResolvedValue(null),
@@ -91,19 +96,32 @@ describe('UserService Test', () => {
             });
 
 
-            userRepository.create.mockReturnValue(createUserDto as User);
-            scryptService.kdf.mockResolvedValue(Buffer.from('hashedPassword'));
+            userRepository.create.mockImplementation((dto) => {
+                return {
+                    ...dto,
+                    id: 1,
+                    createdAt
+                } as User;
+            });
 
-            // When
-            const result = await userService.register(createUserDto);
+
+
+
 
 
             // Then
+            const result = await userService.register(createUserDto);
+
+
             expect(dataSource.transaction).toHaveBeenCalled();
             expect(mockManager.findOneBy).toHaveBeenCalledWith(User, {email: 'john@example.com'});
-            expect(userRepository.create).toHaveBeenCalledWith(createUserDto);
+            expect(argon.hash).toHaveBeenCalledWith('securePassword123');
+
+            // create가 호출될 때 비밀번호가 해시된 값을 가지고 있는지 확인
+            const createCall = userRepository.create.mock.calls[0][0];
+            expect(createCall.password).toBe(hashedPassword);
+
             expect(mockManager.save).toHaveBeenCalled();
-            expect(scryptService.kdf).toHaveBeenCalledWith('securePassword123');
             expect(result).toEqual(expectedUser);
         });
 
