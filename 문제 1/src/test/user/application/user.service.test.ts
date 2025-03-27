@@ -105,10 +105,6 @@ describe('UserService Test', () => {
             });
 
 
-
-
-
-
             // Then
             const result = await userService.register(createUserDto);
 
