@@ -20,5 +20,57 @@
 - tag로 post를 검색할수 있어야 한다
 
 ---
+### ERD 설계
+```sql
+CREATE TABLE user
+(
+    user_id    int auto_increment primary key,
+    name       varchar(50)  not null,
+    email      varchar(100) not null unique,
+    password   varchar(100) not null,
+    is_delete  boolean default true not null, 
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP null,
+    deleted_at timestamp null 
+);
+
+CREATE TABLE post
+(
+    post_id    int auto_increment primary key,
+    title      varchar(100) not null, 
+    content    text not null, 
+    user_id    int not null,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP null,
+    FOREIGN KEY (user_id) REFERENCES user(user_id)
+);
+
+CREATE TABLE tag
+(
+    tag_id     int auto_increment primary key,
+    name       varchar(50) not null unique, 
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP null
+);
+
+-- N:M 관계를 위한 연결 테이블 추가
+CREATE TABLE post_tag
+(
+    post_id    int not null,
+    tag_id     int not null,
+    PRIMARY KEY (post_id, tag_id), 
+    FOREIGN KEY (post_id) REFERENCES post(post_id),
+    FOREIGN KEY (tag_id) REFERENCES tag(tag_id),
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP null
+);
+```
+### 설계 목표
+1. 데이터 무결성(사용자 탈퇴 시에도 게시글 보존)
+2. post,tag 간의 N:M 관계 post_tag 구현 복합 기본키로 중복방지
+3. tag.name에 유니크 추가 하여 중복 태그 방지 ,태그기반 검색을 위한 인덱싱 용이
+
 
 ### 💡 추가질문 - 성능을 개선하기 위한 아이디어를 제시해 주세요
+1. 성능목표가 개선이 무엇이냐에 따라 다릅니다.
+2. 게시글의 조회 tps가 늘어나면 master/slave 구조로 쿼리 분산을 할겁니다.
+3. 하지만 대용량 tps 즉 100M tps 이상으로 가게되면 파티셔닝 을 하고 range 로 시계열 데이터를 파티셔닝 할겁니다.
+   실제로 파티셔닝시 range 파티셔닝 + 구현화 뷰 로 쿼리성능을 단축시켰습니다.
+4. 또 다른 방법은 Nosql 이나 캐쉬 스토리지를 써서 조회를 처리하는겁니다. 
+   실제로 카산드라로 Query Service 를 분리 하여 CQRS Pattern 을 도입하여 처리시 대용량 트래픽 처리가 가능했습니다.

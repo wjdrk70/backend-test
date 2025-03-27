@@ -1,0 +1,17 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: example_1
+    environment:
+      MYSQL_ROOT_PASSWORD: mypassword
+      MYSQL_DATABASE: example  # 기본 데이터베이스 이름
+      MYSQL_USER: guest    # 추가 사용자 이름
+      MYSQL_PASSWORD: mypassword  # 해당 사용자 비밀번호
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
